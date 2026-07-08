@@ -10,7 +10,7 @@ A = Tr*s^2 + s;
 B = K;
 
 %% Requirements
-PeakTime = 3.5;
+PeakTime = 1.5;
 OS = 2.5;
 
 damping_r = -log(OS/100) / sqrt(pi^2 + log(OS/100)^2);
@@ -40,7 +40,7 @@ Coef_CharEqn = coeffs(expand(CharEqn), s, 'All');
 sol = solve(Coef_F == Coef_CharEqn, [r0 r1 r2 s1 s0]);
 
 % Prefilter T
-T = double(cCharact_eqn(5)/K);
+T = double(Coef_CharEqn(5)/K);
 
 r2_d = double(sol.r2)
 r1_d = double(sol.r1)
@@ -85,15 +85,3 @@ fprintf('Gain Margin = %.2f (%.2f dB)\n', GM, 20*log10(GM));
 fprintf('Phase Margin = %.2f deg\n', PM);
 fprintf('Modulus margin Mm = %.3f\n', Mm);
 fprintf('Maximum sensitivity Ms = %.3f\n', Ms);
-
-
-
-
-
-
-
-
-
-
-
-
