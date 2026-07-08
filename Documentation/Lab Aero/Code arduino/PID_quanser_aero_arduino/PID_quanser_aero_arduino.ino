@@ -23,15 +23,39 @@ float Ts = 0.002; // second
 float yaw_desired = PI/6;
 float yaw_read;
 float MotorVoltage_calc;
+float    motorVoltagePrev2 = 0;
+float    motorVoltagePrev  = 0;
+    
+float    yaw_desiredPrev2 = 0;
+float    yaw_desiredPrev  = 0;
+    
+float    yaw_readPrev2 = 0;
+float    yaw_readPrev  = 0;
 
 int NumLoopCnt = 0; // Loop counter for changing reference
-int NumLoop = 3000; // Number of loop to change the reference
+int NumLoop = 30000; // Number of loop to change the reference
 
+volatile bool controlCalc = false;
+
+// Interrupt service routine
+ISR(TIMER1_COMPA_vect)
+{
+  OCR1A += 32000; // Advance The COMPA Register
+  // 2 ms sampling time
+  controlCalc = true;
+}
 
 /*-----------------------------------------*/
 
 //This function will be called once during initialization
 void setup() {
+  // Timer setup
+  TCCR1A = 0;           // Init Timer1
+  TCCR1B = 0;           // Init Timer1
+  TCCR1B |= B00000001;  // Prescalar = 64
+  OCR1A = 32000;        // Timer CompareA Register
+  TIMSK1 |= B00000010;  // Enable Timer Overflow Interrupt
+  
   // Set the slaveSelectPin as an output
   pinMode(slaveSelectPin, OUTPUT);
 
@@ -45,10 +69,8 @@ void setup() {
 // This function will be called repeatedly until Arduino is reset
 void loop() {
   // Serial plotter
-  Serial.print("Yaw_angle_(rad):");
   Serial.print(yaw);
   Serial.print(",");
-  Serial.print("Reference_yaw_(rad):");
   Serial.println(yaw_desired);
   
   // After 3000 loops, change the yaw_desired = -yaw_desired (for students)
@@ -73,24 +95,47 @@ void loop() {
   readSensors();
   yaw_read = yaw;
 
-  // PID Controller (for students)
-  
+  if (controlCalc == true) {
+    // PID Controller (for students)
 
-  // The variable "motor0Voltage" and "motor1Voltage" is saturated within the range of -24V to 24V. (for students)
-  if (motor1Voltage > 24) {
-    motor1Voltage = 24;
-  }
-  else if (motor1Voltage < -24) {
-    motor1Voltage = -24;
-  }
-  motor0Voltage = - motor1Voltage;
-  motor1Voltage = 5;
-  
-  // drive motor
-  driveMotor();
-  
+    // RST Controller
+    motor1Voltage =
+      1.967 * motorVoltagePrev
+    - 0.967 * motorVoltagePrev2
 
-  delay(Ts*1000);
+    + 0.01481 * yaw_desired
+    + 0.02962 * yaw_desiredPrev
+    + 0.01481 * yaw_desiredPrev2
+
+    - 4151.0 * yaw_read
+    + 8278.0 * yaw_readPrev
+    - 4127.0 * yaw_readPrev2;
+
+    if (motor1Voltage > 24) {
+      motor1Voltage = 24;
+    }
+    else if (motor1Voltage < -24) {
+      motor1Voltage = -24;
+    }
+
+    // Update histories
+    motorVoltagePrev2 = motorVoltagePrev;
+    motorVoltagePrev  = motor1Voltage;
+    
+    yaw_desiredPrev2 = yaw_desiredPrev;
+    yaw_desiredPrev  = yaw_desired;
+    
+    yaw_readPrev2 = yaw_readPrev;
+    yaw_readPrev  = yaw_read;
+  
+    // The variable "motor0Voltage" and "motor1Voltage" is saturated within the range of -24V to 24V. (for students)
+
+    motor0Voltage = - motor1Voltage;
+    
+    // drive motor
+    driveMotor();
+    controlCalc = false;
+  }
   // take the slave select pin high to de-select the device
   digitalWrite(slaveSelectPin, HIGH);
   SPI.endTransaction();
