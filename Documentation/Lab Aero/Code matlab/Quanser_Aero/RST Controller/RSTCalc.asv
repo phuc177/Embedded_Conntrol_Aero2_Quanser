@@ -1,21 +1,33 @@
 close all;
 
-syms r0 r1 r2 s1 s0 s;
+syms r0 r1 r2 s2 s1 s0 s;
 
 % System transfer function = B/A
 Tr = 7.01; % Time constant
 K = 0.17; % Gain
+Ts = 0.002; % sampling time
 G = tf(K, [Tr 1 0]);
 A = Tr*s^2 + s;
 B = K;
 
-%% Requirements
-PeakTime = 3.5;
+% Pade approximation for zero order hold (ZOH)
+zoh = tf(2, [Ts 2]);
+zohA = (Ts*s + 2);
+zohB = 2;
+
+A = A*zohA;
+B = zoh*B;
+
+% Switch the plant to a discrete plant behavior by combine with the ZOH
+G = G*zoh;
+
+%% Requirement Tset
+PeakTime = 1.5;
 OS = 2.5;
 
 damping_r = -log(OS/100) / sqrt(pi^2 + log(OS/100)^2);
 omega_n = pi / (PeakTime*sqrt(1-damping_r^2));
-Ts = 4 / (damping_r*omega_n);
+Tset = 4 / (damping_r*omega_n);
 
 % coefficient of the wanted characteristic equation: d2*s^2 + d1*s + d0
 d2 = 1;
@@ -32,35 +44,50 @@ S = s*(s1*s + s0);
 R = r2*s^2 + r1*s + r0;
 
 % Characteristic equation
-D = A*S + B*R;
+F = A*S + B*R;
 
-% Coefficient matching
+%% Coefficient matching
 Coef_F = coeffs(expand(F), s, 'All');
-Coef_F = Coef_F / Coef_F(1);
 Coef_CharEqn = coeffs(expand(CharEqn), s, 'All');
-sol = solve(Coef_F == Coef_CharEqn, [Kd Kp]);
-Kp_d = double(sol.Kp)
-Kd_d = double(sol.Kd)
+sol = solve(Coef_F == Coef_CharEqn, [r0 r1 r2 s1 s0]);
+
+% Prefilter T
+T = double(Coef_CharEqn(5)/K);
+
+r2_d = double(sol.r2)
+r1_d = double(sol.r1)
+r0_d = double(sol.r0)
+s1_d = double(sol.s1)
+s0_d = double(sol.s0)
 
 %% Stability and robustness analysis
 % Open-loop transfer function
-C = tf([Kd_d Kp_d],1);
+R = tf([r2_d r1_d r0_d],1);
+S = tf([s1_d s0_d 0],1);      
+C = R/S;
 L = C*G;
 
 % Gain margin and phase margin
 figure;
 margin(L);
 grid on;
+title("Bode plot of the system");
 
 figure;
 nyquist(L);
+title("Nyquist plot of the system");
 
 figure;
 rlocus(L);
+title("Root locus of the system");
 grid on;
 
 % Sensitivy function
 S_f = feedback(1,L);
+figure;
+bodemag(S_f);
+title("Magnitude plot of the sensitivity function S");
+grid on;
 
 [Ms,wpeak] = getPeakGain(S_f);
 Mm = 1/Ms;
@@ -68,83 +95,5 @@ Mm = 1/Ms;
 
 fprintf('Gain Margin = %.2f (%.2f dB)\n', GM, 20*log10(GM));
 fprintf('Phase Margin = %.2f deg\n', PM);
-fprintf('Maximum sensitivity Ms = %.3f\n', Ms);
 fprintf('Modulus margin Mm = %.3f\n', Mm);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-% 
-% % RST controller calculation
-
-% 
-% cD = coeffs(expand(D), s, 'All');
-% cCharact_eqn = coeffs(expand(Charact_eqn), s, 'All');
-% 
-% sol = solve(cD == cCharact_eqn, [r0 r1 r2 s1 s0]);
-% 
-% T = double(cCharact_eqn(5)/K);
-% 
-% r2_d = double(sol.r2)
-% r1_d = double(sol.r1)
-% r0_d = double(sol.r0)
-% s1_d = double(sol.s1)
-% s0_d = double(sol.s0)
-% 
-% 
-% %% Plant
-% G = tf(0.17,[7.01 1 0]);
-% 
-% %% Controller
-% R = tf([r2_d r1_d r0_d],1);
-% S = tf([s1_d s0_d 0],[1]);      % s*(s1*s+s0)
-% 
-% C = R/S;
-% 
-% PD = tf([81 79], 1);
-% 
-% C = C;
-% 
-% %% Open-loop transfer function
-% L = C*G;
-% 
-% %% Gain margin and phase margin
-% figure;
-% margin(L);
-% grid on;
-% figure;
-% nyquist(L);
-% % 
-% figure;
-% rlocus(L);
-% grid on;
-% title('Root Locus of the Compensated System');
-% 
-% feedback(L,1)
-% pole(feedback(L,1))
-% 
-% % Sensitivy function
-% S_f = feedback(1,L);
-% 
-% [Ms,wpeak] = getPeakGain(S_f);
-% Mm = 1/Ms;
-% 
-% fprintf('Maximum sensitivity Ms = %.3f\n', Ms);
-% fprintf('Modulus margin Mm = %.3f\n', Mm);
-% fprintf('Peak occurs at %.3f rad/s\n', wpeak);
+fprintf('Maximum sensitivity Ms = %.3f\n', Ms);

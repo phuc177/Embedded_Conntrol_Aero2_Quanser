@@ -1,21 +1,22 @@
 close all;
 
-syms r0 r1 r2 s1 s0 s;
+syms r0 r1 r2 s2 s1 s0 s;
 
 % System transfer function = B/A
 Tr = 7.01; % Time constant
 K = 0.17; % Gain
+Ts = 0.002; % sampling time
 G = tf(K, [Tr 1 0]);
 A = Tr*s^2 + s;
 B = K;
 
-%% Requirements
+%% Requirement Tset
 PeakTime = 1.5;
 OS = 2.5;
 
 damping_r = -log(OS/100) / sqrt(pi^2 + log(OS/100)^2);
 omega_n = pi / (PeakTime*sqrt(1-damping_r^2));
-Ts = 4 / (damping_r*omega_n);
+Tset = 4 / (damping_r*omega_n);
 
 % coefficient of the wanted characteristic equation: d2*s^2 + d1*s + d0
 d2 = 1;

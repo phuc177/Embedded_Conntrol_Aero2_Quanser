@@ -23,17 +23,24 @@ float Ts = 0.002; // second
 float yaw_desired = PI/6;
 float yaw_read;
 float MotorVoltage_calc;
-float    motorVoltagePrev2 = 0;
-float    motorVoltagePrev  = 0;
+float motorVoltagePrev2 = 0;
+float motorVoltagePrev  = 0;
     
-float    yaw_desiredPrev2 = 0;
-float    yaw_desiredPrev  = 0;
+float yaw_desiredPrev2 = 0;
+float yaw_desiredPrev  = 0;
     
-float    yaw_readPrev2 = 0;
-float    yaw_readPrev  = 0;
+float yaw_readPrev2 = 0;
+float yaw_readPrev  = 0;
+float yaw_error = 0;
+float yaw_errorPrev = 0;
+float yawErrorRateFilter = 0;
+float yawErrorRateFilterPrev = 0;
+float Kp = 200;
+float Kd = 100;
+float alpha = Ts*20 / (1 + 20*Ts);
 
 int NumLoopCnt = 0; // Loop counter for changing reference
-int NumLoop = 30000; // Number of loop to change the reference
+int NumLoop = 3000; // Number of loop to change the reference
 
 volatile bool controlCalc = false;
 
@@ -69,7 +76,11 @@ void setup() {
 // This function will be called repeatedly until Arduino is reset
 void loop() {
   // Serial plotter
+  Serial.print(millis());
+  Serial.print(",");
   Serial.print(yaw);
+  Serial.print(",");
+  Serial.print(motor1Voltage);
   Serial.print(",");
   Serial.println(yaw_desired);
   
@@ -94,23 +105,27 @@ void loop() {
   // read the sensors
   readSensors();
   yaw_read = yaw;
+  yaw_error = yaw_desired - yaw_read;
 
   if (controlCalc == true) {
     // PID Controller (for students)
+    yawErrorRateFilter = alpha*(yaw_error - yaw_errorPrev)/Ts + (1 - alpha)*yawErrorRateFilterPrev;  
+    motor1Voltage = Kp*yaw_error + Kd*yawErrorRateFilter; 
 
     // RST Controller
-    motor1Voltage =
-      1.967 * motorVoltagePrev
-    - 0.967 * motorVoltagePrev2
+    // motor1Voltage =
+    //   1.967 * motorVoltagePrev
+    // - 0.967 * motorVoltagePrev2
 
-    + 0.01481 * yaw_desired
-    + 0.02962 * yaw_desiredPrev
-    + 0.01481 * yaw_desiredPrev2
+    // + 0.01481 * yaw_desired
+    // + 0.02962 * yaw_desiredPrev
+    // + 0.01481 * yaw_desiredPrev2
 
-    - 4151.0 * yaw_read
-    + 8278.0 * yaw_readPrev
-    - 4127.0 * yaw_readPrev2;
+    // - 4151.0 * yaw_read
+    // + 8278.0 * yaw_readPrev
+    // - 4127.0 * yaw_readPrev2;
 
+    // The variable "motor0Voltage" and "motor1Voltage" is saturated within the range of -24V to 24V. (for students)
     if (motor1Voltage > 24) {
       motor1Voltage = 24;
     }
@@ -128,7 +143,8 @@ void loop() {
     yaw_readPrev2 = yaw_readPrev;
     yaw_readPrev  = yaw_read;
   
-    // The variable "motor0Voltage" and "motor1Voltage" is saturated within the range of -24V to 24V. (for students)
+    yawErrorRateFilterPrev = yawErrorRateFilter;
+    yaw_errorPrev = yaw_error;
 
     motor0Voltage = - motor1Voltage;
     
